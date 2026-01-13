@@ -28,7 +28,7 @@ export class Index {
     return this.map.get(value) || [];
   }
 
-  // checks if  value exists (for uniqueness check)  prevents duplication of data and returns an errors
+  // checks if  value exists (for uniqueness check)  prevents duplication of data and returns an error
   exists(value:any): boolean {
     return this.map.has(value)
   }
