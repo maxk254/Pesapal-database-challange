@@ -1,4 +1,4 @@
-//this is for the typescript types
+//this defines the typescript types 
 
 export enum Datatype{
   INT = "INT",
@@ -35,5 +35,6 @@ export interface QueryResult {
 
 export interface WhereCondition {
   column: string;
-  operator: '=' | '!=' | '>' | '<' | '>=' | '<='
+  operator: '=' | '!=' | '>' | '<' | '>=' | '<=';
+  value :any;
 }

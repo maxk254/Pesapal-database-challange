@@ -1,0 +1,19 @@
+{
+  "name": "simple-db",
+  "version": "1.0.0",
+  "description": "A simple relational database engine",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/repl.ts",
+    "test": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "node-sql-parser": "^4.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

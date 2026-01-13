@@ -1,18 +1,10 @@
 {
   "name": "pesapal-db",
   "version": "1.0.0",
+  "description": "Simple RDBMS for pesapal junior Dev challange 2026",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "@types/node": "^25.0.6",
-    "readline-sync": "^1.4.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "setup": "cd simple-db && npm install",
+    "db" : "cd simple-db && npm run dev"
   }
 }
