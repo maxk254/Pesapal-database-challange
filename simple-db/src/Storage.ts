@@ -6,7 +6,7 @@ import { Row, TableSchema } from './types';
 
 // storage handles reading  and writing data to JSON file
 
-export class storage {
+export class Storage {
   private dataDir: string;
 
   constructor(dataDir: string = "./data") {
