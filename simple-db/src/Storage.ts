@@ -20,17 +20,6 @@ export class Storage {
     }
   }
 
-// exact location for the users folder
-  // private getTablePath(tableName: string): string {
-  //   return path.join(this.dataDir, `${tableName}.json`)
-  // }
-
-
-  // // exact organization of the folder
-  // private getSchemaPath(tableNmae: string): string {
-  //   return path.join(this.dataDir, `${tableName}.schema.json`);
-  // }
-
   // save table structure
   saveSchema(tableName: string, schema: TableSchema): void {
     const schemaPath = path.join(this.dataDir, `${tableName}.schema.json`);
