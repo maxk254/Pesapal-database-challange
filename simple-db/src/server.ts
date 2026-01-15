@@ -59,7 +59,11 @@ app.post('/api/patients', (req, res) => {
 });
 
 
-// ...START SERVER....
-app.listen(PORT, () =>{
-    console.log(`\n✅ server running on port  ${PORT}`);
+// --- START SERVER ---
+// We convert PORT to a number and explicitly listen on '0.0.0.0' for Render
+const portNumber = Number(PORT); 
+
+app.listen(portNumber, '0.0.0.0', () => {
+    console.log(`\n✅ Server is running on port ${portNumber}`);
+    console.log(`   - Internal Address: http://0.0.0.0:${portNumber}`);
 });
