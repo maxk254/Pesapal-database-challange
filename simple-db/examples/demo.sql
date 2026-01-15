@@ -14,7 +14,6 @@ INSERT INTO patients (id, name, status) VALUES (102, 'Sarah Connor', 'Critical')
 
 -- 4. View the Ward Report
 -- This parses the storage and displays data in a table.
-SELECT * FROM patients;
 
 -- 5. The "Security" Test (Duplicate ID)
 -- This should FAIL because ID 101 already exists.
