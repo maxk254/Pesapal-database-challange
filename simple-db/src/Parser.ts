@@ -23,7 +23,7 @@ export class Parser {
 
   // helper to extract tables names from AST 
   getTableName(ast: any): string {
-    if (ast.tables) {
+    if (ast.table) {
       // sometimes its an array sometimes a single object
       if (Array.isArray(ast.table)) {
         return ast.table[0].table;
