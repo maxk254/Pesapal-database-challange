@@ -1,6 +1,6 @@
 //this defines the typescript types 
 
-export enum Datatype{
+export enum DataType{
   INT = "INT",
   VARCHAR = 'VARCHAR',
   TEXT = "TEXT",
@@ -10,7 +10,7 @@ export enum Datatype{
 
 export interface column {
   name: string;
-  type: Datatype;
+  type: DataType;
   isPrimaryKey?: boolean;
   isUnique?: boolean;
   maxLength?: number;
