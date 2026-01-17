@@ -46,8 +46,8 @@ app.post("/api/patients", (req, res) => {
       });
     }
 
-    // Fixed Typo: 'INSER' -> 'INSERT'
-    const sql = `INSERT INTO patients (id, name, status) VALUES (${id}, '${name}', '${status}')`;
+    // Fixed the quote
+    const sql = `INSERT INTO patients (id, name, status) VALUES ('${id}', '${name}', '${status}')`;
     const result = db.execute(sql);
 
     if (result.success) {
