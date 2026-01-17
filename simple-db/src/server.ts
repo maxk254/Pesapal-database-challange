@@ -7,7 +7,7 @@ import { Database } from './Database';
 // Initializing the app
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // Initializing Database
 const db = new Database ('daat');
@@ -61,9 +61,9 @@ app.post('/api/patients', (req, res) => {
 
 // --- START SERVER ---
 // We convert PORT to a number and explicitly listen on '0.0.0.0' for Render
-const portNumber = Number(PORT); 
+// const portNumber = Number(PORT); 
 
-app.listen(portNumber, '0.0.0.0', () => {
-    console.log(`\n✅ Server is running on port ${portNumber}`);
-    console.log(`   - Internal Address: http://0.0.0.0:${portNumber}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`\n✅ Server is running on port ${PORT}`);
+    // console.log(`   - Internal Address: http://0.0.0.0:${portNumber}`);
 });
