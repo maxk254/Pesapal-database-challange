@@ -60,8 +60,8 @@ export class Database {
     const tableName = ast.table[0].table;
 
     const columns: column[] = ast.create_definitions.map((def: any) => {
-
-      const rawType = def.definition?.dataType || def.definition?.type || "VARCHAR";
+      const rawType =
+        def.definition?.dataType || def.definition?.type || "VARCHAR";
 
       return {
         name: def.column.column,
@@ -111,7 +111,20 @@ export class Database {
     const tableName = this.parser.getTableName(ast);
     const tables = this.getTable(tableName);
 
-    const values = ast.values[0].value.map((v: any) => v.value);
+    // FIX: Parse values carefully
+    const values = ast.values[0].value.map((v: any) => {
+      // If it has a direct value (like 'String' or 123), use it
+      if (v.value !== undefined) return v.value;
+
+      // If it's a "math" expression (like P-100 without quotes), it fails here
+      throw new Error(`SQL Parse Error: Value is missing quotes. Did you mean '${v.left?.value || "VALUE"}'?`);
+    });
+
+    // Check for "Ghost Data" (undefined values)
+    if (values.some((val: any) => val === undefined || val === null)) {
+      throw new Error("Invalid SQL: Cannot insert empty or undefined values.");
+    }
+
     tables.insert(values);
 
     return {
