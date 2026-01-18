@@ -5,28 +5,35 @@ import { Database } from "./Database";
 
 // Initializing the app
 const app = express();
-
 const PORT = process.env.PORT || 10000;
 
-// Initializing Database
-const db = new Database("daat");
+// 1. Fixed Typo: changed "daat" to "data"
+const db = new Database("data");
 
-// --- MIDDLEWARE FIXED ---
-// You must include the () to invoke the function!
+// --- 2. CRITICAL FIX: Initialize Table on Startup ---
+// This creates the patients.json file if it doesn't exist
+try {
+  db.execute(
+    "CREATE TABLE patients (id, name, age, gender, diagnosis, status)"
+  );
+  console.log("✅ Database Table 'patients' checked/initialized.");
+} catch (error) {
+  console.log("ℹ️ Table initialization skipped (might already exist).");
+}
+
 app.use(cors());
 app.use(bodyParser.json());
 
-console.log("Start Clincalite backend");
+console.log("Starting Clinicalite backend...");
 
 // ROOT URL check
 app.get("/", (req, res) => {
   res.send("✅ Clinicalite API is Running!");
 });
 
-// GET /Patients
+// --- R. READ (Get All Patients) ---
 app.get("/api/patients", (req, res) => {
   try {
-    // Fixed Typo: 'patiens' -> 'patients'
     const result = db.execute("SELECT * from patients");
     res.json(result);
   } catch (error: any) {
@@ -34,20 +41,24 @@ app.get("/api/patients", (req, res) => {
   }
 });
 
-// POST /patients
+// --- C. CREATE (Admit Patient) ---
 app.post("/api/patients", (req, res) => {
   try {
-    const { id, name, status } = req.body;
+    // 3. Fixed: Extract ALL fields
+    const { id, name, age, gender, diagnosis, status } = req.body;
 
-    if (!id || !name || !status) {
+    if (!id || !name) {
       return res.status(400).json({
         success: false,
-        message: "Missing fields! please provide id, name and status.",
+        message: "Missing fields! ID and Name are required.",
       });
     }
 
-    // Fixed the quote
-    const sql = `INSERT INTO patients (id, name, status) VALUES ('${id}', '${name}', '${status}')`;
+    // 4. Fixed: Save ALL fields to the database
+    // Note: We use '${value}' to prevent the "Ghost Data" math bug
+    const sql = `INSERT INTO patients (id, name, age, gender, diagnosis, status) VALUES ('${id}', '${name}', '${age}', '${gender}', '${diagnosis}', '${status}')`;
+
+    console.log("📝 Executing:", sql); // Debug log
     const result = db.execute(sql);
 
     if (result.success) {
@@ -60,41 +71,41 @@ app.post("/api/patients", (req, res) => {
   }
 });
 
-// --- ☢️ DATABASE RESET BUTTON ☢️ ---
-// Add this temporarily to fix the corrupted file
-import fs from 'fs';
-import path from 'path';
-
-app.get('/api/reset-db', (req, res) => {
+// --- U. UPDATE (Edit Patient) ---
+//  Added: The missing route for your Edit Button
+app.put("/api/patients", (req, res) => {
   try {
-    // 1. Locate the file (it's usually in /data or ../data)
-    // We try both common locations to be safe
-    const pathsToCheck = [
-      path.join(__dirname, 'data', 'patients.json'),
-      path.join(__dirname, '../data', 'patients.json')
-    ];
+    const { id, status } = req.body;
+    if (!id)
+      return res.status(400).json({ success: false, message: "ID required" });
 
-    let found = false;
-    for (const p of pathsToCheck) {
-      if (fs.existsSync(p)) {
-        // Overwrite it with an empty list
-        fs.writeFileSync(p, '[]'); 
-        console.log(`✅ Wiped database at: ${p}`);
-        found = true;
-      }
-    }
+    // Update the status
+    const sql = `UPDATE patients SET status='${status}' WHERE id='${id}'`;
+    const result = db.execute(sql);
 
-    if (found) {
-      res.send("<h1>✅ Success! Database has been wiped clean.</h1><p>You can now go back and add patients.</p>");
-    } else {
-      res.send("<h1>⚠️ No database file found.</h1><p>The system might be clean already.</p>");
-    }
+    res.json(result);
   } catch (error: any) {
-    res.status(500).send(`❌ Failed to reset: ${error.message}`);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// --- D. DELETE (Discharge Patient) ---
+// Added: The missing route for your delete
+app.delete("/api/patients/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = `DELETE FROM patients WHERE id='${id}'`;
+    const result = db.execute(sql);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // --- START SERVER ---
 app.listen(Number(PORT), "0.0.0.0", () => {
   console.log(`\n✅ Server is running on port ${PORT}`);
   console.log(`   - Internal Address: http://0.0.0.0:${PORT}`);
 });
+
+
