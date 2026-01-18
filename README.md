@@ -25,13 +25,14 @@ The system is modularized into three core components:
 ### 1. Installation
 Clone the repository and install dependencies:
 ```bash
+cd simple-db
 npm install
 
 ### HOW TO RUN Automamted Test
-npm run test
+npm test
 
 ### How to launch Interactive Terminal (REPL)
-npm run dev
+npm start
 
 ### Supported SQL Commands
 CREATE TABLE patients (id INT PRIMARY KEY, name VARCHAR, status VARCHAR)
