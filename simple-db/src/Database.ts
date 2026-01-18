@@ -1,203 +1,224 @@
 // this is the main database class
 
-import { Storage } from "./Storage";
-import { Parser } from "./Parser";
-import { Table } from "./Tables";
-import { TableSchema,column,DataType, QueryResult,  } from "./types";
+import fs from "fs";
+import path from "path";
 
-// database cordinates everything
-// it handles sql commands and routes them to the right operations
+type Schema = string[]; // e.g., ["id", "name", "status"]
+type Row = Record<string, string>; // e.g., { id: "1", name: "John" }
 
 export class Database {
-  private storage: Storage; // saves the data
-  private parser: Parser; // understands the command
-  private tables: Map<string, Table> = new Map();
+  private tables: Map<string, { schema: Schema; data: Row[] }> = new Map();
+  private dataDir: string;
 
-  constructor(dataDir: string = "./data") {
-    this.storage = new Storage(dataDir);
-    this.parser = new Parser();
-    this.loadExistingTables();
+  constructor(folderName: string) {
+    // 1. Resolve path safely (Handles relative paths correctly)
+    this.dataDir = path.join(process.cwd(), folderName);
+
+    // 2. Ensure folder exists immediately
+    if (!fs.existsSync(this.dataDir)) {
+      fs.mkdirSync(this.dataDir, { recursive: true });
+      console.log(`📂 Created database folder: ${this.dataDir}`);
+    }
+
+    // 3. Load existing tables from disk
+    this.loadTables();
   }
 
-  // load tables that already exists on the disk
-  private loadExistingTables(): void {
-    const tableNames = this.storage.listTables();
-    tableNames.forEach((name) => {
-      const schema = this.storage.loadSchema(name);
-      if (schema) {
-        this.tables.set(name, new Table(this.storage, schema));
-      }
-    });
-  }
+  // --- CORE ENGINE ---
 
-  // executes any SQL commands
-  execute(sql: string): QueryResult {
+  public execute(sql: string): any {
+    const command = sql.trim().split(" ")[0].toUpperCase();
+
     try {
-      const ast = this.parser.parse(sql);
-
-      // route to appropriate handler based on command type
-      if (ast.type === "create") {
-        return this.handleCreate(ast);
-      } else if (ast.type === "insert") {
-        return this.handleInsert(ast);
-      } else if (ast.type === "select") {
-        return this.handleSelect(ast);
-      } else if (ast.type === "update") {
-        return this.handleUpdate(ast);
-      } else if (ast.type === "delete") {
-        return this.handleDelete(ast);
-      } else {
-        throw new Error(`Unsuppoted commnd: ${ast.type}`);
+      switch (command) {
+        case "CREATE":
+          return this.handleCreate(sql);
+        case "INSERT":
+          return this.handleInsert(sql);
+        case "SELECT":
+          return this.handleSelect(sql);
+        case "DELETE":
+          return this.handleDelete(sql);
+        case "UPDATE":
+          return this.handleUpdate(sql);
+        default:
+          throw new Error(`Unknown command: ${command}`);
       }
     } catch (error: any) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
-  private handleCreate(ast: any): QueryResult {
-    const tableName = ast.table[0].table;
 
-    const columns: column[] = ast.create_definitions.map((def: any) => {
-      const rawType =
-        def.definition?.dataType || def.definition?.type || "VARCHAR";
+  // --- HANDLERS ---
 
-      return {
-        name: def.column.column,
-        type: String(rawType).toUpperCase() as DataType,
-        isPrimaryKey: def.primary_key ? true : false,
-        isUnique: def.unique_key ? true : false,
-        maxLength: def.definition?.length,
-      };
+  // Handles (CREATE Operation)
+  private handleCreate(sql: string) {
+    // Example: CREATE TABLE patients (id, name, status)
+    const match = sql.match(/CREATE TABLE (\w+) \((.+)\)/i);
+    if (!match)
+      throw new Error("Syntax Error: CREATE TABLE table_name (col1, col2)");
+
+    const tableName = match[1];
+    const columns = match[2].split(",").map((c) => c.trim());
+
+    if (this.tables.has(tableName)) {
+      return { success: true, message: "Table already exists" };
+    }
+
+    // Create empty table in memory
+    this.tables.set(tableName, { schema: columns, data: [] });
+
+    // Save empty file to disk
+    this.saveTable(tableName);
+
+    return { success: true, message: `Table '${tableName}' created.` };
+  }
+
+  //  Handles inputing data (Create operation)
+  private handleInsert(sql: string) {
+    // Example: INSERT INTO patients (id, name) VALUES ('1', 'John')
+    const match = sql.match(/INSERT INTO (\w+) \((.+)\) VALUES \((.+)\)/i);
+    if (!match)
+      throw new Error("Syntax Error: INSERT INTO table (cols) VALUES (vals)");
+
+    const tableName = match[1];
+    if (!this.tables.has(tableName))
+      throw new Error(`Table '${tableName}' does not exist.`);
+
+    const cols = match[2].split(",").map((c) => c.trim());
+    // Remove quotes from values
+    const vals = match[3].split(",").map((v) => v.trim().replace(/^'|'$/g, ""));
+
+    const table = this.tables.get(tableName)!;
+
+    // --- 🛡️ NEW: DUPLICATE CHECK GUARD 🛡️ ---
+    // 1. Find the index of the "id" column
+    const idIndex = cols.indexOf("id");
+
+    // 2. If an ID was provided, check if it already exists in the table
+    if (idIndex !== -1) {
+      const newId = vals[idIndex];
+      const duplicate = table.data.find((row) => row.id === newId);
+
+      if (duplicate) {
+        // ❌ REJECT THE INSERT
+        throw new Error(
+          `Duplicate Entry: Patient with ID '${newId}' already exists.`
+        );
+      }
+    }
+
+    const newRow: Row = {};
+
+    // Map columns to values
+    cols.forEach((col, index) => {
+      newRow[col] = vals[index] || "";
     });
 
-    const schema: TableSchema = { name: tableName, columns };
+    table.data.push(newRow);
+    this.saveTable(tableName); // Persist to disk
 
-    this.storage.saveSchema(tableName, schema);
-    this.storage.saveData(tableName, []);
-    this.tables.set(tableName, new Table(this.storage, schema));
-
-    return {
-      success: true,
-      message: `Table '${tableName}' created successfully`,
-    };
+    return { success: true, message: "Row inserted.", data: newRow };
   }
-  // private handleCreate(ast: any): QueryResult {
-  //   // Extract table schema from AST
-  //   const tableName = ast.table[0].table;
-  //   const columns: column[] = ast.create_definitions.map((def: any) => ({
-  //     name: def.column.column,
-  //     type: def.definition.DataType.toUpperCase() as DataType,
-  //     isPrimaryKey: def.primary_key,
-  //     isUnique: def.unique_key,
-  //     maxLength: def.definition.length,
-  //   }));
 
-  //   const schema: TableSchema = { name: tableName, columns };
+  // Handles select
+  private handleSelect(sql: string) {
+    // Example: SELECT * from patients
+    const match = sql.match(/SELECT \* from (\w+)/i);
+    if (!match) throw new Error("Syntax Error: SELECT * from table");
 
-  //   // save schema and create tables
-  //   this.storage.saveSchema(tableName, schema);
-  //   this.storage.saveData(tableName, []); // creates a  empty file
-  //   this.tables.set(tableName, new Table(this.storage, schema));
+    const tableName = match[1];
+    if (!this.tables.has(tableName)) {
+      // Auto-recovery: If table missing in memory but file exists, try reloading
+      this.loadTables();
+      if (!this.tables.has(tableName))
+        throw new Error(`Table '${tableName}' does not exist.`);
+    }
 
-  //   return {
-  //     success: true,
-  //     message: `Table '${tableName}' created successfully`,
-  //   };
-  // }
+    return { success: true, data: this.tables.get(tableName)!.data };
+  }
+  // Handles (Delete operation)
+  private handleDelete(sql: string) {
+    // Example: DELETE FROM patients WHERE id='123'
+    const match = sql.match(/DELETE FROM (\w+) WHERE (\w+)='(.+)'/i);
+    if (!match)
+      throw new Error("Syntax Error: DELETE FROM table WHERE col='val'");
 
-  private handleInsert(ast: any): QueryResult {
-    const tableName = this.parser.getTableName(ast);
-    const tables = this.getTable(tableName);
+    const [_, tableName, col, val] = match;
+    if (!this.tables.has(tableName))
+      throw new Error(`Table '${tableName}' does not exist.`);
 
-    // FIX: Parse values carefully
-    const values = ast.values[0].value.map((v: any) => {
-      // If it has a direct value (like 'String' or 123), use it
-      if (v.value !== undefined) return v.value;
+    const table = this.tables.get(tableName)!;
+    const originalLength = table.data.length;
 
-      // If it's a "math" expression (like P-100 without quotes), it fails here
-      throw new Error(`SQL Parse Error: Value is missing quotes. Did you mean '${v.left?.value || "VALUE"}'?`);
+    // Filter out the row
+    table.data = table.data.filter((row) => row[col] !== val);
+
+    if (table.data.length !== originalLength) {
+      this.saveTable(tableName);
+      return { success: true, message: "Row deleted." };
+    }
+    return { success: false, message: "No matching row found." };
+  }
+// Handles (UPDate Operation)
+  private handleUpdate(sql: string) {
+    // Example: UPDATE patients SET status='Admitted' WHERE id='123'
+    const match = sql.match(
+      /UPDATE (\w+) SET (\w+)='(.+)' WHERE (\w+)='(.+)'/i
+    );
+    if (!match)
+      throw new Error(
+        "Syntax Error: UPDATE table SET col='val' WHERE col='val'"
+      );
+
+    const [_, tableName, setCol, setVal, whereCol, whereVal] = match;
+    if (!this.tables.has(tableName))
+      throw new Error(`Table '${tableName}' does not exist.`);
+
+    const table = this.tables.get(tableName)!;
+    let updated = false;
+
+    table.data = table.data.map((row) => {
+      if (row[whereCol] === whereVal) {
+        updated = true;
+        return { ...row, [setCol]: setVal };
+      }
+      return row;
     });
 
-    // Check for "Ghost Data" (undefined values)
-    if (values.some((val: any) => val === undefined || val === null)) {
-      throw new Error("Invalid SQL: Cannot insert empty or undefined values.");
+    if (updated) {
+      this.saveTable(tableName);
+      return { success: true, message: "Row updated." };
     }
-
-    tables.insert(values);
-
-    return {
-      success: true,
-      message: `1 row inserted into '${tableName}'`,
-      rowCount: 1,
-    };
+    return { success: false, message: "No matching row found." };
   }
 
-  private handleSelect(ast: any): QueryResult {
-    const tableName = this.parser.getTableName(ast);
-    const table = this.getTable(tableName);
+  // --- FILE SYSTEM HELPERS ---
 
-    const columns =
-      ast.columns === "*" ? ["*"] : ast.columns.map((c: any) => c.expr.column);
-
-    // column= value
-    let whereColumn, whereValue;
-    if (ast.where) {
-      whereColumn = ast.where.left.column;
-      whereValue = ast.where.right.value;
-    }
-
-    const row = table.select(columns, whereColumn, whereValue);
-
-    return {
-      success: true,
-      data: row,
-      rowCount: row.length,
-    };
+  private saveTable(tableName: string) {
+    const filePath = path.join(this.dataDir, `${tableName}.json`);
+    const tableData = this.tables.get(tableName)!.data;
+    fs.writeFileSync(filePath, JSON.stringify(tableData, null, 2));
   }
 
-  private handleUpdate(ast: any): QueryResult {
-    const tableName = this.parser.getTableName(ast);
-    const table = this.getTable(tableName);
+  private loadTables() {
+    if (!fs.existsSync(this.dataDir)) return;
 
-    const update: any = {};
-    ast.set.forEach((s: any) => {
-      update[s.column] = s.value.value;
+    const files = fs.readdirSync(this.dataDir);
+    files.forEach((file) => {
+      if (file.endsWith(".json")) {
+        const tableName = file.replace(".json", "");
+        const content = fs.readFileSync(path.join(this.dataDir, file), "utf-8");
+        try {
+          const data = JSON.parse(content);
+          // Infer schema from first row or default
+          const schema = data.length > 0 ? Object.keys(data[0]) : [];
+          this.tables.set(tableName, { schema, data });
+          console.log(`📦 Loaded table: ${tableName} (${data.length} rows)`);
+        } catch (e) {
+          console.error(`⚠️ Failed to load ${file}: Corrupt JSON`);
+        }
+      }
     });
-    const whereColumn = ast.where.left.column;
-    const whereValue = ast.where.right.value;
-
-    const count = table.update(update, whereColumn, whereValue);
-
-    return {
-      success: true,
-      message: `${count} row(s) update`,
-      rowCount: count,
-    };
   }
-
-  private handleDelete(ast: any): QueryResult {
-    const tableName = this.parser.getTableName(ast);
-    const table = this.getTable(tableName);
-
-    const whereColumn = ast.where.left.column;
-    const whereValue = ast.where.right.value;
-
-    const count = table.delete(whereColumn, whereValue);
-
-    return {
-      success: true,
-      message: `${count} row(s) deleted`,
-      rowCount: count,
-    };
-  }
-
-  private getTable(tableName: string): Table {
-    const table = this.tables.get(tableName);
-    if (!table) {
-      throw new Error(`Tables '${tableName}' does not exist`);
-    }
-    return table;
-  }
-}
+};
