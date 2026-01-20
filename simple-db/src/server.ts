@@ -34,8 +34,41 @@ app.get("/", (req, res) => {
 // --- R. READ (Get All Patients) ---
 app.get("/api/patients", (req, res) => {
   try {
+    //  get querry parameters (defults: page1, 10 items per page)
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = (req.query.serch as string || "").toLowerCase();
+
+    // get all data 
     const result = db.execute("SELECT * from patients");
-    res.json(result);
+    let allPatients = result.data || [];
+
+    // FILTER by Search term (ID or Name)
+    if (search) {
+      allPatients = allPatients.filter((p: { name: string; id: string; }) =>
+        p.name.toLowerCase().includes(search) ||
+        p.id.toLowerCase().includes(search)
+      );
+    }
+
+    // claculate the limit 'slices'
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    // slice the data
+    const paginatedPatients = allPatients.slice(startIndex, endIndex);
+
+    // send back data + extra info for to frontend
+    res.json({
+      success: true,
+      data: paginatedPatients,
+      pagination: {
+        total: allPatients.length,
+        page: page,
+        limit: limit,
+        totalPages: Math.ceil(allPatients.length/ limit)
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
