@@ -37,7 +37,7 @@ app.get("/api/patients", (req, res) => {
     //  get querry parameters (defults: page1, 10 items per page)
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-    const search = (req.query.serch as string || "").toLowerCase();
+    const search = (req.query.search as string || "").toLowerCase();
 
     // get all data 
     const result = db.execute("SELECT * from patients");
